@@ -188,10 +188,13 @@ async function fetchTasks() {
   render();
 }
 
+
 $('add-btn').onclick = async () => {
   const title = $('task-input').value.trim();
-  const deadline = $('deadline-input').value;
+  const rawDeadline = $('deadline-input').value; // lấy giá trị nhập vào
   if (!title) return alert('Nhập công việc');
+  // fix: đổi sang iso string (utc) trước khi gửi
+  const deadline = rawDeadline ? new Date(rawDeadline).toISOString() : null;
 
   await apiFetch('/tasks', {
     method: 'POST',
@@ -353,10 +356,11 @@ async function saveEdit(icon, id, titleInput, deadlineInput, oldTitle, oldDeadli
   const newTitle = titleInput.value.trim();
   if (!newTitle) return alert('Tiêu đề không được rỗng');
 
-  const newDeadline = deadlineInput.value || null;
-
+  // fix: Chuyển đổi sang iso string (utc) trước khi gửi
+  const rawDeadline = deadlineInput.value;
+  const newDeadline = rawDeadline ? new Date(rawDeadline).toISOString() : null;
   const task = state.tasks.find(t => t.id === id);
-
+  
   await apiFetch(`/tasks/${id}`, {
     method: 'PUT',
     body: JSON.stringify({
