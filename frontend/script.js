@@ -1,5 +1,5 @@
 /* ================= CONFIG & STATE ================= */
-const API = import.meta.env.VITE_API_URL;
+const API = window.API_URL || document.body.dataset.apiUrl || '';
 
 const state = {
   token: localStorage.getItem('token'),
@@ -13,6 +13,7 @@ let otpCooldown = 60;
 let otpTimer = null;
 let otpExpireSeconds = 300; // 5 phút
 let otpExpireTimer = null;
+let missingApiWarned = false;
 
 
 function saveAuth(email, token) {
@@ -27,6 +28,14 @@ function clearAuth() {
 }
 
 async function apiFetch(path, options = {}) {
+  if (!API) {
+    if (!missingApiWarned) {
+      alert('Thiếu cấu hình API. Vui lòng thiết lập API_URL trước khi đăng nhập.');
+      missingApiWarned = true;
+    }
+    throw new Error('Missing API base URL');
+  }
+
   const headers = {
     'Content-Type': 'application/json',
     ...(state.token && { Authorization: `Bearer ${state.token}` })
