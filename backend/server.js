@@ -2,28 +2,20 @@ const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const path = require("path");
 const db = require("./db");
 require("dotenv").config();
+
+const { Resend } = require("resend");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "CHANGE_THIS_SECRET_FOR_PRODUCTION";
 
 /* =====================
-   EMAIL SETUP
+   RESEND SETUP
 ===================== */
-
-const nodemailer = require("nodemailer");
-
-const mailer = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
+const resend = new Resend(process.env.RESEND_API_KEY);
+const EMAIL_FROM = process.env.EMAIL_FROM || "onboarding@resend.dev";
 
 /* =====================
    MIDDLEWARE
@@ -45,7 +37,7 @@ function authenticate(req, res, next) {
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload; // { userId, email }
+    req.user = payload;
     next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
@@ -62,110 +54,102 @@ app.get("/", (req, res) => {
   });
 });
 
+/* =====================
+   OTP UTILS
+===================== */
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
+
+/* =====================
+   REQUEST OTP
+===================== */
 app.post("/api/register/request-otp", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ error: "Thiếu email hoặc mật khẩu" });
+  try {
+    const { email, password } = req.body;
+    if (!email || !password)
+      return res.status(400).json({ error: "Thiếu email hoặc mật khẩu" });
 
-  const exists = await db.query(
-    "SELECT id FROM users WHERE email = $1",
-    [email]
-  );
-  if (exists.rows.length > 0)
-    return res.status(400).json({ error: "Email đã được đăng ký" });
+    const exists = await db.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email]
+    );
+    if (exists.rows.length > 0)
+      return res.status(400).json({ error: "Email đã được đăng ký" });
 
-  const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const otp = generateOTP();
+    const expires = new Date(Date.now() + 5 * 60 * 1000);
 
-  const otp = generateOTP();
-  const expires = new Date(Date.now() + 5 * 60 * 1000);
+    await db.query(
+      "UPDATE email_otps SET verified = true WHERE email = $1",
+      [email]
+    );
 
-  await db.query(
-    "UPDATE email_otps SET verified = true WHERE email = $1",
-    [email]
-  );
+    await db.query(
+      `INSERT INTO email_otps (email, otp, expires_at, password_hash)
+       VALUES ($1, $2, $3, $4)`,
+      [email, otp, expires, passwordHash]
+    );
 
-  await db.query(
-    `INSERT INTO email_otps (email, otp, expires_at, password_hash)
-     VALUES ($1, $2, $3, $4)`,
-    [email, otp, expires, passwordHash]
-  );
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: email,
+      subject: "Mã xác thực đăng ký",
+      html: `
+        <h2>Mã OTP của bạn: <b>${otp}</b></h2>
+        <p>Có hiệu lực trong 5 phút</p>
+      `
+    });
 
-  await mailer.sendMail({
-    to: email,
-    subject: "Mã xác thực đăng ký",
-    html: `<h2>Mã OTP của bạn là <b>${otp}</b></h2>
-           <p>Có hiệu lực 5 phút</p>`
-  });
+    res.json({ success: true });
 
-  res.json({ success: true });
+  } catch (err) {
+    console.error("OTP ERROR:", err);
+    res.status(500).json({ error: "Không gửi được email" });
+  }
 });
 
+/* =====================
+   VERIFY OTP
+===================== */
 app.post("/api/register/verify-otp", async (req, res) => {
-  const { email, otp } = req.body;
+  try {
+    const { email, otp } = req.body;
 
-  const result = await db.query(
-    `SELECT * FROM email_otps
-     WHERE email = $1 AND otp = $2 AND verified = false
-     ORDER BY created_at DESC
-     LIMIT 1`,
-    [email, String(otp).trim()]
-  );
+    const result = await db.query(
+      `SELECT * FROM email_otps
+       WHERE email = $1 AND otp = $2 AND verified = false
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [email, String(otp).trim()]
+    );
 
-  if (result.rows.length === 0)
-    return res.status(400).json({ error: "OTP không đúng" });
+    if (result.rows.length === 0)
+      return res.status(400).json({ error: "OTP không đúng" });
 
-  const record = result.rows[0];
+    const record = result.rows[0];
 
-  if (new Date() > record.expires_at)
-    return res.status(400).json({ error: "OTP đã hết hạn" });
+    if (new Date() > record.expires_at)
+      return res.status(400).json({ error: "OTP đã hết hạn" });
 
-  await db.query(
-    "UPDATE email_otps SET verified = true WHERE id = $1",
-    [record.id]
-  );
+    await db.query(
+      "UPDATE email_otps SET verified = true WHERE id = $1",
+      [record.id]
+    );
 
-  await db.query(
-    "INSERT INTO users(email, password_hash) VALUES ($1, $2)",
-    [email, record.password_hash]
-  );
+    await db.query(
+      "INSERT INTO users(email, password_hash) VALUES ($1, $2)",
+      [email, record.password_hash]
+    );
 
-  res.json({ success: true });
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("VERIFY OTP ERROR:", err);
+    res.status(500).json({ error: "Xác thực thất bại" });
+  }
 });
-
-
-
-// /* =====================
-//    REGISTER
-// ===================== */
-// app.post("/api/register", async (req, res) => {
-//   const { email, password } = req.body;
-//   if (!email || !password)
-//     return res.status(400).json({ error: "Vui lòng nhập email và mật khẩu" });
-
-//   try {
-//     const exists = await db.query(
-//       "SELECT id FROM users WHERE email = $1",
-//       [email]
-//     );
-//     if (exists.rows.length > 0)
-//       return res.status(400).json({ error: "Email đã tồn tại" });
-
-//     const hash = await bcrypt.hash(password, 10);
-
-//     await db.query(
-//       "INSERT INTO users(email, password_hash) VALUES ($1, $2)",
-//       [email, hash]
-//     );
-
-//     res.json({ message: "Đăng ký thành công" });
-//   } catch (err) {
-//     console.error("REGISTER ERROR:", err.message);
-//     res.status(500).json({ error: err.message });
-//   }
-// });
 
 /* =====================
    LOGIN
@@ -173,7 +157,7 @@ app.post("/api/register/verify-otp", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password)
-    return res.status(400).json({ error: "Vui lòng nhập đầy đủ email và mật khẩu" });
+    return res.status(400).json({ error: "Thiếu email hoặc mật khẩu" });
 
   try {
     const result = await db.query(
@@ -194,39 +178,31 @@ app.post("/api/login", async (req, res) => {
     );
 
     res.json({ token, email });
+
   } catch (err) {
-    console.error("LOGIN ERROR:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({ error: "Login failed" });
   }
 });
 
 /* =====================
-   GET TASKS
+   TASK APIs
 ===================== */
 app.get("/api/tasks", authenticate, async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT id,
-              title,
-              description,
-              completed,
-              deadline
-       FROM tasks
+      `SELECT * FROM tasks
        WHERE user_id = $1
        ORDER BY id DESC`,
       [req.user.userId]
     );
 
     res.json({ tasks: result.rows });
-  } catch (err) {
-    console.error(err);
+  } catch {
     res.status(500).json({ error: "Fetch tasks failed" });
   }
 });
 
-/* =====================
-   CREATE TASK
-===================== */
 app.post("/api/tasks", authenticate, async (req, res) => {
   const { title, description, deadline } = req.body;
 
@@ -239,20 +215,16 @@ app.post("/api/tasks", authenticate, async (req, res) => {
         req.user.userId,
         title,
         description || null,
-        deadline || null   
+        deadline || null
       ]
     );
 
     res.json({ id: result.rows[0].id });
-  } catch (err) {
-    console.error(err);
+  } catch {
     res.status(500).json({ error: "Create task failed" });
   }
 });
 
-/* =====================
-   UPDATE TASK
-===================== */
 app.put("/api/tasks/:id", authenticate, async (req, res) => {
   const { title, description, deadline, completed } = req.body;
 
@@ -275,15 +247,11 @@ app.put("/api/tasks/:id", authenticate, async (req, res) => {
     );
 
     res.json({ success: true });
-  } catch (err) {
-    console.error(err);
+  } catch {
     res.status(500).json({ error: "Update failed" });
   }
 });
 
-/* =====================
-   DELETE TASK
-===================== */
 app.delete("/api/tasks/:id", authenticate, async (req, res) => {
   try {
     await db.query(
@@ -292,22 +260,23 @@ app.delete("/api/tasks/:id", authenticate, async (req, res) => {
     );
 
     res.json({ success: true });
-  } catch (err) {
-    console.error(err);
+  } catch {
     res.status(500).json({ error: "Delete failed" });
   }
 });
 
 /* =====================
-   REMINDER EMAILS
+   REMINDER EMAIL
 ===================== */
-
 async function sendReminderEmail(email, task) {
-  await mailer.sendMail({
-    from: process.env.EMAIL_USER,
+  await resend.emails.send({
+    from: EMAIL_FROM,
     to: email,
-    subject: "⏰ Nhắc việc Todo List",
-    text: `Công việc "${task.title}" sẽ đến hạn lúc ${new Date(task.deadline).toLocaleString("vi-VN")}`
+    subject: "⏰ Nhắc việc",
+    html: `
+      <p>Công việc <b>${task.title}</b> 
+      đến hạn lúc ${new Date(task.deadline).toLocaleString("vi-VN")}</p>
+    `
   });
 }
 
@@ -328,7 +297,6 @@ cron.schedule("* * * * *", async () => {
 
     for (const task of result.rows) {
       await sendReminderEmail(task.email, task);
-
       await db.query(
         "UPDATE tasks SET reminded = true WHERE id = $1",
         [task.id]
@@ -339,80 +307,9 @@ cron.schedule("* * * * *", async () => {
   }
 });
 
-
-
-
 /* =====================
-  AI NLP (Gemini)
-===================== */
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-app.post("/api/nlp", authenticate, async (req, res) => {
-  const { text } = req.body;
-  if (!text) return res.status(400).json({ error: "Text is required" });
-
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    // Lấy thời gian hiện tại để AI hiểu "ngày mai", "tuần sau" là bao giờ
-    const nowVN = new Date().toLocaleString("vi-VN", {
-  timeZone: "Asia/Ho_Chi_Minh"
-});
-;
-    
-    const prompt = `
-      Bạn là một trợ lý ảo quản lý công việc (Todo API).
-Nhiệm vụ: Phân tích câu nói của người dùng và trích xuất thông tin thời gian dựa trên ngữ cảnh hiện tại.
-
-THÔNG TIN QUAN TRỌNG (Context):
-- Thời gian hiện tại chính xác là: ${nowVN} (Múi giờ GMT+7) 
-- Ngày tháng năm hiện tại là: ${new Date().getFullYear()}.
-- Mọi mốc thời gian (hôm nay, ngày mai, cuối tuần) PHẢI tính toán dựa trên thời gian này.
-- Nếu không xác định được title, hãy tạo title ngắn gọn từ nội dung người dùng.
-
-
-INPUT: "${text}"
-
-OUTPUT JSON FORMAT (Chỉ trả về JSON thuần, không markdown):
-{
-  "title": "Tên công việc ngắn gọn",
-  "description": "Chi tiết nếu có, hoặc null",
-  "deadline": "ISO 8601 String (YYYY-MM-DDTHH:mm:ss+07:00)",
-  "due_date": "YYYY-MM-DD HH:mm:ss",
-  "reminded": false
-}
-    `;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let textResponse = response.text();
-
-    // Làm sạch chuỗi nếu AI lỡ trả về format markdown (```json ...)
-    textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    const data = JSON.parse(textResponse);
-
-    res.json({
-      title: data.title || text, // Fallback nếu AI không tách được title
-      deadline: data.deadline
-    });
-
-  } catch (err) {
-    console.error("NLP ERROR:", err);
-    // Fallback về logic cũ nếu AI lỗi hoặc hết quota
-    res.json({
-      title: text,
-      deadline: null
-    });
-  }
-});
-/* =====================
-   START SERVER
+   START
 ===================== */
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
-
-
-
