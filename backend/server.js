@@ -30,7 +30,6 @@ const mailer = nodemailer.createTransport({
 ===================== */
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
 
 /* =====================
    AUTH MIDDLEWARE
@@ -57,7 +56,10 @@ function authenticate(req, res, next) {
    ROOT
 ===================== */
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.json({
+    status: "OK",
+    message: "Backend API running"
+  });
 });
 
 function generateOTP() {
