@@ -40,9 +40,14 @@ async function apiFetch(path, options = {}) {
     'Content-Type': 'application/json',
     ...(state.token && { Authorization: `Bearer ${state.token}` })
   };
-
-  const res = await fetch(API + path, { ...options, headers });
-
+  
+  let res;
+  try {
+    res = await fetch(API + path, { ...options, headers });
+  } catch (error) {
+    alert('Không kết nối được máy chủ. Vui lòng kiểm tra API_URL hoặc CORS.');
+    throw error;
+  }
   if (res.status === 401) {
     alert('Phiên đăng nhập đã hết hạn');
     clearAuth();
@@ -50,7 +55,21 @@ async function apiFetch(path, options = {}) {
     throw new Error('Unauthorized');
   }
 
-  return res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch (error) {
+    if (!res.ok) {
+      return { error: `Máy chủ trả về lỗi (${res.status})` };
+    }
+    throw error;
+  }
+
+  if (!res.ok && !data?.error) {
+    return { error: `Máy chủ trả về lỗi (${res.status})` };
+  }
+
+  return data;
 }
 
 /* ================= AUTH ================= */
