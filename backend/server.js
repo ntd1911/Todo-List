@@ -405,15 +405,6 @@ OUTPUT JSON FORMAT (Chỉ trả về JSON thuần, không markdown):
     });
   }
 });
-//route test
-app.get("/test-db", async (req, res) => {
-  try {
-    const r = await db.query("SELECT NOW()");
-    res.json(r.rows);
-  } catch (e) {
-    res.json({ error: e.message });
-  }
-});
 /* =====================
    START SERVER
 ===================== */
