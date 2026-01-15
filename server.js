@@ -339,18 +339,71 @@ cron.schedule("* * * * *", async () => {
 
 
 
-/* =====================
-   NLP MOCK
-===================== */
-app.post("/api/nlp", authenticate, (req, res) => {
-  const { text } = req.body;
-  if (!text)
-    return res.status(400).json({ error: "Text is required" });
 
-  res.json({
-    title: text.slice(0, 120),
-    deadline: new Date(Date.now() + 86400000).toISOString()
-  });
+/* =====================
+  AI NLP (Gemini)
+===================== */
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+app.post("/api/nlp", authenticate, async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: "Text is required" });
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // Lấy thời gian hiện tại để AI hiểu "ngày mai", "tuần sau" là bao giờ
+    const nowVN = new Date().toLocaleString("vi-VN", {
+  timeZone: "Asia/Ho_Chi_Minh"
+});
+;
+    
+    const prompt = `
+      Bạn là một trợ lý ảo quản lý công việc (Todo API).
+Nhiệm vụ: Phân tích câu nói của người dùng và trích xuất thông tin thời gian dựa trên ngữ cảnh hiện tại.
+
+THÔNG TIN QUAN TRỌNG (Context):
+- Thời gian hiện tại chính xác là: ${nowVN} (Múi giờ GMT+7) 
+- Ngày tháng năm hiện tại là: ${new Date().getFullYear()}.
+- Mọi mốc thời gian (hôm nay, ngày mai, cuối tuần) PHẢI tính toán dựa trên thời gian này.
+- Nếu không xác định được title, hãy tạo title ngắn gọn từ nội dung người dùng.
+
+
+INPUT: "${text}"
+
+OUTPUT JSON FORMAT (Chỉ trả về JSON thuần, không markdown):
+{
+  "title": "Tên công việc ngắn gọn",
+  "description": "Chi tiết nếu có, hoặc null",
+  "deadline": "ISO 8601 String (YYYY-MM-DDTHH:mm:ss+07:00)",
+  "due_date": "YYYY-MM-DD HH:mm:ss",
+  "reminded": false
+}
+    `;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let textResponse = response.text();
+
+    // Làm sạch chuỗi nếu AI lỡ trả về format markdown (```json ...)
+    textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    const data = JSON.parse(textResponse);
+
+    res.json({
+      title: data.title || text, // Fallback nếu AI không tách được title
+      deadline: data.deadline
+    });
+
+  } catch (err) {
+    console.error("NLP ERROR:", err);
+    // Fallback về logic cũ nếu AI lỗi hoặc hết quota
+    res.json({
+      title: text,
+      deadline: null
+    });
+  }
 });
 
 /* =====================
