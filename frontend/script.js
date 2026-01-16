@@ -1,5 +1,5 @@
 /* ================= CONFIG & STATE ================= */
-const API = window.API_URL || document.body.dataset.apiUrl || '';
+const API = import.meta.env.VITE_API_URL;
 
 const state = {
   token: localStorage.getItem('token'),
