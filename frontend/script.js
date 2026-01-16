@@ -78,7 +78,7 @@ $('btn-login').onclick = async () => {
   const password = $('auth-pass').value;
   if (!email || !password) return alert('Nhập email và mật khẩu');
 
-  const data = await apiFetch('/login', {
+  const data = await apiFetch('/api/login', {
     method: 'POST',
     body: JSON.stringify({ email, password })
   });
@@ -136,7 +136,7 @@ $('btn-send-otp').onclick = async () => {
   if (!email || !password)
     return alert('Vui lòng nhập email và mật khẩu');
 
-  const data = await apiFetch('/register/request-otp', {
+  const data = await apiFetch('/api/register/request-otp', {
     method: 'POST',
     body: JSON.stringify({ email, password })
   });
@@ -145,11 +145,27 @@ $('btn-send-otp').onclick = async () => {
 
   alert('Mã OTP đã được gửi về email');
   $('reg-otp').classList.remove('hidden');
-  $('btn-verify-otp').classList.remove('hidden');
   $('btn-resend-otp').classList.remove('hidden');
   startOtpCooldown();
   startOtpExpireTimer();
   $('btn-send-otp').classList.add('hidden');
+};
+
+$('btn-verify-otp').onclick = async () => {
+  const email = $('reg-email').value.trim();
+  const otp = $('reg-otp').value.trim();
+
+  if (!otp) return alert('Nhập mã OTP');
+
+  const data = await apiFetch('/api/register/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp })
+  });
+
+  if (data.error) return alert(data.error);
+
+  alert('Đăng ký thành công! Giờ bạn có thể đăng nhập');
+  toggleAuth(true);
 };
 
 $('btn-resend-otp').onclick = async () => {
@@ -159,7 +175,7 @@ $('btn-resend-otp').onclick = async () => {
   if (!email || !password)
     return alert('Thiếu email hoặc mật khẩu');
 
-  const data = await apiFetch('/register/request-otp', {
+  const data = await apiFetch('/api/register/request-otp', {
     method: 'POST',
     body: JSON.stringify({ email, password })
   });
@@ -170,26 +186,6 @@ $('btn-resend-otp').onclick = async () => {
   startOtpCooldown();
   startOtpExpireTimer();
 };
-
-
-$('btn-verify-otp').onclick = async () => {
-  const email = $('reg-email').value.trim();
-  const otp = $('reg-otp').value.trim();
-
-  if (!otp) return alert('Vui lòng nhập mã OTP');
-
-  const data = await apiFetch('/register/verify-otp', {
-    method: 'POST',
-    body: JSON.stringify({ email, otp })
-  });
-
-  if (data.error) return alert(data.error);
-
-  alert('Đăng ký thành công!');
-  $('switch-login').click();
-};
-
-
 
 /* ================= UI ================= */
 $('switch-login').onclick = () => toggleAuth(true);
@@ -211,7 +207,7 @@ if (state.token && state.user) showApp();
 
 /* ================= TASK API ================= */
 async function fetchTasks() {
-  const data = await apiFetch('/tasks');
+  const data = await apiFetch('/api/tasks');
   state.tasks = data.tasks || [];
   render();
 }
@@ -224,7 +220,7 @@ $('add-btn').onclick = async () => {
   // fix: đổi sang iso string (utc) trước khi gửi
   const deadline = rawDeadline ? new Date(rawDeadline).toISOString() : null;
 
-  await apiFetch('/tasks', {
+  await apiFetch('/api/tasks', {
     method: 'POST',
     body: JSON.stringify({ title, deadline })
   });
@@ -239,12 +235,13 @@ $('nlp-btn').onclick = async () => {
   const text = $('nlp-input').value.trim();
   if (!text) return;
 
-  const data = await apiFetch('/nlp', {
+  const data = await apiFetch('/api/nlp', {
     method: 'POST',
     body: JSON.stringify({ text })
   });
 
-  await apiFetch('/tasks', {
+  if (data.error) return alert(data.error);
+  await apiFetch('/api/tasks', {
     method: 'POST',
     body: JSON.stringify(data)
   });
@@ -303,7 +300,7 @@ async function toggle(id) {
   render();
 
   try {
-    await apiFetch(`/tasks/${id}`, {
+    await apiFetch(`/api/tasks/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ completed: t.completed })
     });
@@ -317,7 +314,7 @@ async function toggle(id) {
 
 
 async function del(id) {
-  await apiFetch(`/tasks/${id}`, { method: 'DELETE' });
+  await apiFetch(`/api/tasks/${id}`, { method: 'DELETE' });
   fetchTasks();
 }
 
@@ -389,7 +386,7 @@ async function saveEdit(icon, id, titleInput, deadlineInput, oldTitle, oldDeadli
   const newDeadline = rawDeadline ? new Date(rawDeadline).toISOString() : null;
   const task = state.tasks.find(t => t.id === id);
   
-  await apiFetch(`/tasks/${id}`, {
+  await apiFetch(`/api/tasks/${id}`, {
     method: 'PUT',
     body: JSON.stringify({
       ...task,

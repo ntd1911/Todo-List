@@ -8,7 +8,7 @@ const { Resend } = require("resend");
 const cron = require("node-cron");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000; // Render dùng PORT
 const JWT_SECRET = process.env.JWT_SECRET;
 
 /* =====================
@@ -28,13 +28,11 @@ const EMAIL_FROM = process.env.EMAIL_FROM;
 /* =====================
    MIDDLEWARE
 ===================== */
-app.use(cors({
-  origin: "*"
-}));
+app.use(cors());
 app.use(express.json());
 
 /* =====================
-   AUTH MIDDLEWARE
+   AUTH
 ===================== */
 function authenticate(req, res, next) {
   const auth = req.headers.authorization;
@@ -42,7 +40,7 @@ function authenticate(req, res, next) {
     return res.status(401).json({ error: "Missing token" });
 
   const [type, token] = auth.split(" ");
-  if (type !== "Bearer")
+  if (type !== "Bearer" || !token)
     return res.status(401).json({ error: "Invalid token" });
 
   try {
@@ -65,7 +63,7 @@ app.get("/", (req, res) => {
 });
 
 /* =====================
-   OTP UTILS
+   OTP
 ===================== */
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -153,7 +151,8 @@ app.post("/api/register/verify-otp", async (req, res) => {
 
     res.json({ success: true });
 
-  } catch {
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ error: "Verify fail" });
   }
 });
@@ -187,7 +186,8 @@ app.post("/api/login", async (req, res) => {
 
     res.json({ token, email });
 
-  } catch {
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ error: "Login fail" });
   }
 });
@@ -221,40 +221,8 @@ app.post("/api/tasks", authenticate, async (req, res) => {
   res.json({ id: r.rows[0].id });
 });
 
-app.put("/api/tasks/:id", authenticate, async (req, res) => {
-  const { title, description, deadline, completed } = req.body;
-
-  await db.query(
-    `UPDATE tasks SET
-     title=COALESCE($1,title),
-     description=COALESCE($2,description),
-     deadline=COALESCE($3,deadline),
-     completed=COALESCE($4,completed)
-     WHERE id=$5 AND user_id=$6`,
-    [
-      title ?? null,
-      description ?? null,
-      deadline ?? null,
-      completed ?? null,
-      req.params.id,
-      req.user.userId
-    ]
-  );
-
-  res.json({ success: true });
-});
-
-app.delete("/api/tasks/:id", authenticate, async (req, res) => {
-  await db.query(
-    "DELETE FROM tasks WHERE id=$1 AND user_id=$2",
-    [req.params.id, req.user.userId]
-  );
-
-  res.json({ success: true });
-});
-
 /* =====================
-   CRON REMINDER
+   CRON
 ===================== */
 cron.schedule("* * * * *", async () => {
   const r = await db.query(`
@@ -281,10 +249,74 @@ cron.schedule("* * * * *", async () => {
     );
   }
 });
+/* =====================
+  AI NLP (Gemini)
+===================== */
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+app.post("/api/nlp", authenticate, async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: "Text is required" });
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // Lấy thời gian hiện tại để AI hiểu "ngày mai", "tuần sau" là bao giờ
+    const nowVN = new Date().toLocaleString("vi-VN", {
+  timeZone: "Asia/Ho_Chi_Minh"
+});
+;
+    
+    const prompt = `
+      Bạn là một trợ lý ảo quản lý công việc (Todo API).
+Nhiệm vụ: Phân tích câu nói của người dùng và trích xuất thông tin thời gian dựa trên ngữ cảnh hiện tại.
+
+THÔNG TIN QUAN TRỌNG (Context):
+- Thời gian hiện tại chính xác là: ${nowVN} (Múi giờ GMT+7) 
+- Ngày tháng năm hiện tại là: ${new Date().getFullYear()}.
+- Mọi mốc thời gian (hôm nay, ngày mai, cuối tuần) PHẢI tính toán dựa trên thời gian này.
+- Nếu không xác định được title, hãy tạo title ngắn gọn từ nội dung người dùng.
+
+
+INPUT: "${text}"
+
+OUTPUT JSON FORMAT (Chỉ trả về JSON thuần, không markdown):
+{
+  "title": "Tên công việc ngắn gọn",
+  "description": "Chi tiết nếu có, hoặc null",
+  "deadline": "ISO 8601 String (YYYY-MM-DDTHH:mm:ss+07:00)",
+  "due_date": "YYYY-MM-DD HH:mm:ss",
+  "reminded": false
+}
+    `;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let textResponse = response.text();
+
+    // Làm sạch chuỗi nếu AI lỡ trả về format markdown (```json ...)
+    textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    const data = JSON.parse(textResponse);
+
+    res.json({
+      title: data.title || text, // Fallback nếu AI không tách được title
+      deadline: data.deadline
+    });
+
+  } catch (err) {
+    console.error("NLP ERROR:", err);
+    // Fallback về logic cũ nếu AI lỗi hoặc hết quota
+    res.json({
+      title: text,
+      deadline: null
+    });
+  }
+});
 /* =====================
    START
 ===================== */
 app.listen(PORT, () => {
-  console.log("🚀 Server:", PORT);
+  console.log(`🚀 Server running at port ${PORT}`);
 });
