@@ -4,8 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Todo List AI</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
-<link rel="stylesheet" href="style.css" />
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -27,7 +30,8 @@
     <h2>Đăng ký</h2>
     <input id="reg-email" type="email" placeholder="Email" />
     <input id="reg-pass" type="password" placeholder="Mật khẩu" />
-    <input id="reg-otp" type="text" placeholder="Nhập mã OTP" class="hidden" />
+    <input id="reg-otp" type="text"
+           placeholder="Nhập mã OTP" class="hidden" />
 
     <div id="otp-timer" class="otp-timer hidden">
         OTP sẽ hết hạn sau <span id="otp-time">05:00</span>
@@ -36,31 +40,41 @@
     <button id="btn-send-otp">Gửi mã OTP</button>
 
     <div class="btn-group">
-        <button id="btn-verify-otp" class="hidden">Xác nhận đăng ký</button>
-        <button id="btn-resend-otp" class="hidden" disabled>Gửi lại OTP (60s)</button>
+        <button id="btn-verify-otp" class="hidden">
+            Xác nhận đăng ký
+        </button>
+        <button id="btn-resend-otp"
+                class="hidden" disabled>
+            Gửi lại OTP (60s)
+        </button>
     </div>
 
     <p>Đã có tài khoản?
-        <span class="link" id="switch-login">Đăng nhập</span>
+        <span class="link" id="switch-login">
+            Đăng nhập
+        </span>
     </p>
 </div>
 
-
 <!-- MAIN APP -->
 <div id="app" class="hidden">
+
     <h1>📝 Todo List AI</h1>
 
-    <!-- THÊM CÔNG VIỆC THỦ CÔNG -->
+    <!-- THÊM THỦ CÔNG -->
     <div class="add-box card">
-        <input id="task-input" type="text" placeholder="Nhập công việc..." />
-        <input id="deadline-input" type="datetime-local" />
+        <input id="task-input"
+               type="text"
+               placeholder="Nhập công việc..." />
+        <input id="deadline-input"
+               type="datetime-local" />
         <button id="add-btn">Thêm</button>
     </div>
 
     <!-- THÊM BẰNG AI -->
     <div class="add-box card">
-        <input id="nlp-input" type="text"
-            placeholder='Ví dụ: "nhắc tôi đi họp vào 5h chiều mai"' />
+        <input id="nlp-input"
+         placeholder='Ví dụ: "nhắc tôi đi họp vào 5h chiều mai"' />
         <button id="nlp-btn">Thêm bằng AI</button>
     </div>
 
@@ -78,7 +92,9 @@
     <!-- TASK LIST -->
     <div id="task-list"></div>
 
-    <button id="logout-btn" class="logout">Đăng xuất</button>
+    <button id="logout-btn" class="logout">
+        Đăng xuất
+    </button>
 </div>
 
 <script src="script.js"></script>
