@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Todo List AI</title>
-    <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Todo List AI</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
 </head>
 
 <body>
 
-<!-- ===== LOGIN / REGISTER ===== -->
+<!-- LOGIN -->
 <div id="auth-container" class="card auth-box">
     <h2>Đăng nhập</h2>
     <input id="auth-email" type="email" placeholder="Email" />
@@ -22,6 +22,7 @@
     </p>
 </div>
 
+<!-- REGISTER -->
 <div id="register-container" class="card auth-box hidden">
     <h2>Đăng ký</h2>
     <input id="reg-email" type="email" placeholder="Email" />
@@ -41,28 +42,32 @@
     </div>
 </div>
 
-<!-- AI -->
-<div class="add-box card">
-    <input id="nlp-input" type="text"
-        placeholder='Ví dụ: "nhắc tôi đi họp vào 5h chiều mai"' />
-    <button id="nlp-btn">Thêm bằng AI</button>
+<div id="app" class="hidden">
+
+    <!-- AI -->
+    <div class="add-box card">
+        <input id="nlp-input" type="text"
+            placeholder='Ví dụ: "nhắc tôi đi họp vào 5h chiều mai"' />
+        <button id="nlp-btn">Thêm bằng AI</button>
+    </div>
+
+    <!-- FILTER -->
+    <div class="filter-box card">
+        <select id="filter">
+            <option value="all">Tất cả</option>
+            <option value="completed">Hoàn thành</option>
+            <option value="pending">Chưa hoàn thành</option>
+        </select>
+
+        <input id="filter-date" type="date" />
+    </div>
+
+    <!-- TASK LIST -->
+    <div id="task-list"></div>
+
+    <button id="logout-btn" class="logout">Đăng xuất</button>
+
 </div>
-
-<!-- FILTER -->
-<div class="filter-box card">
-    <select id="filter">
-        <option value="all">Tất cả</option>
-        <option value="completed">Hoàn thành</option>
-        <option value="pending">Chưa hoàn thành</option>
-    </select>
-
-    <input id="filter-date" type="date" />
-</div>
-
-<!-- TASK LIST -->
-<div id="task-list"></div>
-
-<button id="logout-btn" class="logout">Đăng xuất</button>
 
 <script src="script.js"></script>
 </body>
