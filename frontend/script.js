@@ -145,6 +145,7 @@ $('btn-send-otp').onclick = async () => {
 
   alert('Mã OTP đã được gửi về email');
   $('reg-otp').classList.remove('hidden');
+  $('btn-verify-otp').classList.remove('hidden');
   $('btn-resend-otp').classList.remove('hidden');
   startOtpCooldown();
   startOtpExpireTimer();
@@ -188,7 +189,7 @@ $('btn-resend-otp').onclick = async () => {
 };
 
 /* ================= UI ================= */
-$('switch-login').onclick = () => toggleAuth(true);
+// FIX: Sửa lại để khớp với id trong HTML
 $('switch-register').onclick = () => toggleAuth(false);
 
 function toggleAuth(showLogin) {
@@ -213,24 +214,6 @@ async function fetchTasks() {
 }
 
 
-$('add-btn').onclick = async () => {
-  const title = $('task-input').value.trim();
-  const rawDeadline = $('deadline-input').value; // lấy giá trị nhập vào
-  if (!title) return alert('Nhập công việc');
-  // fix: đổi sang iso string (utc) trước khi gửi
-  const deadline = rawDeadline ? new Date(rawDeadline).toISOString() : null;
-
-  await apiFetch('/api/tasks', {
-    method: 'POST',
-    body: JSON.stringify({ title, deadline })
-  });
-
-  $('task-input').value = '';
-  $('deadline-input').value = '';
-  fetchTasks();
-};
-
-/* ================= NLP ================= */
 $('nlp-btn').onclick = async () => {
   const text = $('nlp-input').value.trim();
   if (!text) return;
@@ -345,17 +328,16 @@ function editTask(icon) {
   deadlineInput.className = 'edit-input';
 
   if (task.deadline) {
-  const d = new Date(task.deadline);
+    const d = new Date(task.deadline);
 
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
 
-  deadlineInput.value = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}
-
+    deadlineInput.value = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  }
 
   deadlineDiv.replaceWith(deadlineInput);
 
@@ -381,7 +363,6 @@ async function saveEdit(icon, id, titleInput, deadlineInput, oldTitle, oldDeadli
   const newTitle = titleInput.value.trim();
   if (!newTitle) return alert('Tiêu đề không được rỗng');
 
-  // fix: Chuyển đổi sang iso string (utc) trước khi gửi
   const rawDeadline = deadlineInput.value;
   const newDeadline = rawDeadline ? new Date(rawDeadline).toISOString() : null;
   const task = state.tasks.find(t => t.id === id);
