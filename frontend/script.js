@@ -1,5 +1,5 @@
 /* ================= CONFIG & STATE ================= */
-const API = import.meta.env.VITE_API_URL;
+const API = "https://todoapp-tgd4.onrender.com/";
 
 const state = {
   token: localStorage.getItem('token'),
