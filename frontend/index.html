@@ -4,81 +4,138 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Todo List AI</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
 <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
 
+<!-- AUTH WRAPPER -->
+<div id="auth-wrapper">
+
 <!-- LOGIN -->
-<div id="auth-container" class="card auth-box">
-    <h2>Đăng nhập</h2>
-    <input id="auth-email" type="email" placeholder="Email" />
-    <input id="auth-pass" type="password" placeholder="Mật khẩu" />
+<section id="auth-container" class="card auth-box">
+    <h2>🔐 Đăng nhập</h2>
+
+    <div class="input-group">
+        <input id="auth-email" type="email" placeholder="Email" />
+        <input id="auth-pass" type="password" placeholder="Mật khẩu" />
+    </div>
+
     <button id="btn-login">Đăng nhập</button>
 
-    <p>Chưa có tài khoản?
-        <span class="link" id="switch-register">Đăng ký</span>
+    <p>
+        Chưa có tài khoản?
+        <span class="link" id="switch-register">
+            Đăng ký ngay
+        </span>
     </p>
-</div>
+</section>
 
 <!-- REGISTER -->
-<div id="register-container" class="card auth-box hidden">
-    <h2>Đăng ký</h2>
-    <input id="reg-email" type="email" placeholder="Email" />
-    <input id="reg-pass" type="password" placeholder="Mật khẩu" />
-    <input id="reg-otp" type="text" placeholder="Nhập mã OTP" class="hidden" />
+<section id="register-container" class="card auth-box hidden">
+    <h2>📝 Đăng ký</h2>
 
-    <div id="otp-timer" class="otp-timer hidden">
-        OTP sẽ hết hạn sau <span id="otp-time">05:00</span>
+    <div class="input-group">
+        <input id="reg-email" type="email" placeholder="Email" />
+        <input id="reg-pass" type="password" placeholder="Mật khẩu" />
+        <input id="reg-otp"
+               type="text"
+               placeholder="Nhập mã OTP"
+               class="hidden" />
     </div>
 
-    <button id="btn-send-otp">Gửi mã OTP</button>
+    <div id="otp-timer"
+         class="otp-timer hidden">
+        OTP sẽ hết hạn sau
+        <span id="otp-time">05:00</span>
+    </div>
+
+    <button id="btn-send-otp">
+        Gửi mã OTP
+    </button>
 
     <div class="btn-group">
-        <button id="btn-verify-otp" class="hidden">Xác nhận đăng ký</button>
-        <button id="btn-resend-otp" class="hidden" disabled>Gửi lại OTP (60s)</button>
+        <button id="btn-verify-otp"
+                class="hidden">
+            Xác nhận đăng ký
+        </button>
+
+        <button id="btn-resend-otp"
+                class="hidden" disabled>
+            Gửi lại OTP (60s)
+        </button>
     </div>
 
-    <p>Đã có tài khoản?
-        <span class="link" id="switch-login">Đăng nhập</span>
+    <p>
+        Đã có tài khoản?
+        <span class="link" id="switch-login">
+            Đăng nhập
+        </span>
     </p>
+</section>
+
 </div>
 
 
-<!-- MAIN APP -->
+<!-- ================= APP ================= -->
 <div id="app" class="hidden">
+
+<header class="app-header">
     <h1>📝 Todo List AI</h1>
+</header>
 
-    <!-- THÊM CÔNG VIỆC THỦ CÔNG -->
-    <div class="add-box card">
-        <input id="task-input" type="text" placeholder="Nhập công việc..." />
-        <input id="deadline-input" type="datetime-local" />
-        <button id="add-btn">Thêm</button>
-    </div>
+<main class="app-container">
 
-    <!-- THÊM BẰNG AI -->
-    <div class="add-box card">
-        <input id="nlp-input" type="text"
-            placeholder='Ví dụ: "nhắc tôi đi họp vào 5h chiều mai"' />
-        <button id="nlp-btn">Thêm bằng AI</button>
-    </div>
+<!-- ADD TASK -->
+<section class="card add-box">
+    <input id="task-input"
+           type="text"
+           placeholder="Nhập công việc..." />
 
-    <!-- FILTER -->
-    <div class="filter-box card">
-        <select id="filter">
-            <option value="all">Tất cả</option>
-            <option value="completed">Hoàn thành</option>
-            <option value="pending">Chưa hoàn thành</option>
-        </select>
+    <input id="deadline-input"
+           type="datetime-local" />
 
-        <input id="filter-date" type="date" />
-    </div>
+    <button id="add-btn">
+        <i class="fa fa-plus"></i> Thêm
+    </button>
+</section>
 
-    <!-- TASK LIST -->
-    <div id="task-list"></div>
+<!-- ADD AI -->
+<section class="card add-box">
+    <input id="nlp-input"
+      placeholder='Ví dụ: "nhắc tôi đi họp vào 5h chiều mai"' />
 
-    <button id="logout-btn" class="logout">Đăng xuất</button>
+    <button id="nlp-btn">
+        🤖 Thêm bằng AI
+    </button>
+</section>
+
+<!-- FILTER -->
+<section class="card filter-box">
+    <select id="filter">
+        <option value="all">Tất cả</option>
+        <option value="completed">Hoàn thành</option>
+        <option value="pending">Chưa hoàn thành</option>
+    </select>
+
+    <input id="filter-date" type="date" />
+</section>
+
+<!-- TASK LIST -->
+<section id="task-list"></section>
+
+</main>
+
+<footer>
+    <button id="logout-btn"
+            class="logout">
+        🚪 Đăng xuất
+    </button>
+</footer>
+
 </div>
 
 <script src="script.js"></script>
