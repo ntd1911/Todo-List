@@ -8,7 +8,7 @@ const { Resend } = require("resend");
 const cron = require("node-cron");
 
 const app = express();
-const PORT = process.env.PORT || 10000; // Render dùng PORT
+const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 /* =====================
@@ -20,10 +20,16 @@ if (!JWT_SECRET) {
 }
 
 /* =====================
-   RESEND
+   RESEND - IMPROVED
 ===================== */
 const resend = new Resend(process.env.RESEND_API_KEY);
-const EMAIL_FROM = process.env.EMAIL_FROM;
+const EMAIL_FROM = process.env.EMAIL_FROM || "Todo App <onboarding@resend.dev>";
+
+// Kiểm tra cấu hình Resend
+if (!process.env.RESEND_API_KEY) {
+  console.error("⚠️  WARNING: RESEND_API_KEY not found in .env");
+}
+console.log("📧 Email configured from:", EMAIL_FROM);
 
 /* =====================
    MIDDLEWARE
@@ -70,7 +76,7 @@ function generateOTP() {
 }
 
 /* =====================
-   REQUEST OTP
+   REQUEST OTP - IMPROVED
 ===================== */
 app.post("/api/register/request-otp", async (req, res) => {
   try {
@@ -78,6 +84,12 @@ app.post("/api/register/request-otp", async (req, res) => {
 
     if (!email || !password)
       return res.status(400).json({ error: "Thiếu dữ liệu" });
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Email không hợp lệ" });
+    }
 
     const exists = await db.query(
       "SELECT id FROM users WHERE email=$1",
@@ -102,18 +114,47 @@ app.post("/api/register/request-otp", async (req, res) => {
       [email, otp, expires, hash]
     );
 
-    await resend.emails.send({
-      from: EMAIL_FROM,
-      to: email,
-      subject: "Mã OTP",
-      html: `<h2>OTP: ${otp}</h2>`
-    });
+    // Improved email sending with better error handling
+    try {
+      const { data, error } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: email,
+        subject: "Mã OTP đăng ký Todo App",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #667eea;">Mã OTP của bạn</h2>
+            <p>Sử dụng mã OTP sau để hoàn tất đăng ký:</p>
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; text-align: center;">
+              <h1 style="color: #667eea; letter-spacing: 5px; margin: 0;">${otp}</h1>
+            </div>
+            <p style="color: #666; margin-top: 20px;">Mã này có hiệu lực trong 5 phút.</p>
+            <p style="color: #999; font-size: 12px;">Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email.</p>
+          </div>
+        `
+      });
 
-    res.json({ success: true });
+      if (error) {
+        console.error("❌ Resend API error:", error);
+        return res.status(500).json({ 
+          error: "Không thể gửi email. Vui lòng thử lại.",
+          details: error.message 
+        });
+      }
+
+      console.log("✅ Email sent successfully:", data);
+      res.json({ success: true, message: "Mã OTP đã được gửi" });
+
+    } catch (emailError) {
+      console.error("❌ Email sending failed:", emailError);
+      return res.status(500).json({ 
+        error: "Lỗi khi gửi email",
+        details: emailError.message 
+      });
+    }
 
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Send OTP fail" });
+    console.error("❌ Server error:", e);
+    res.status(500).json({ error: "Lỗi server" });
   }
 });
 
@@ -132,7 +173,7 @@ app.post("/api/register/verify-otp", async (req, res) => {
     );
 
     if (!result.rows.length)
-      return res.status(400).json({ error: "OTP sai" });
+      return res.status(400).json({ error: "OTP sai hoặc đã được sử dụng" });
 
     const record = result.rows[0];
 
@@ -225,30 +266,54 @@ app.post("/api/tasks", authenticate, async (req, res) => {
    CRON
 ===================== */
 cron.schedule("* * * * *", async () => {
-  const r = await db.query(`
-    SELECT t.id,t.title,t.deadline,u.email
-    FROM tasks t
-    JOIN users u ON t.user_id=u.id
-    WHERE t.completed=false
-    AND t.reminded=false
-    AND t.deadline <= NOW()+INTERVAL '10 minutes'
-    AND t.deadline > NOW()
-  `);
+  try {
+    const r = await db.query(`
+      SELECT t.id,t.title,t.deadline,u.email
+      FROM tasks t
+      JOIN users u ON t.user_id=u.id
+      WHERE t.completed=false
+      AND t.reminded=false
+      AND t.deadline <= NOW()+INTERVAL '10 minutes'
+      AND t.deadline > NOW()
+    `);
 
-  for (const t of r.rows) {
-    await resend.emails.send({
-      from: EMAIL_FROM,
-      to: t.email,
-      subject: "⏰ Nhắc việc",
-      html: `<b>${t.title}</b>`
-    });
+    for (const t of r.rows) {
+      try {
+        const { error } = await resend.emails.send({
+          from: EMAIL_FROM,
+          to: t.email,
+          subject: "⏰ Nhắc việc - Todo App",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #667eea;">⏰ Nhắc nhở công việc</h2>
+              <div style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <p style="margin: 0; font-size: 16px;"><strong>${t.title}</strong></p>
+                <p style="margin: 5px 0 0 0; color: #666;">Deadline: ${new Date(t.deadline).toLocaleString('vi-VN')}</p>
+              </div>
+            </div>
+          `
+        });
 
-    await db.query(
-      "UPDATE tasks SET reminded=true WHERE id=$1",
-      [t.id]
-    );
+        if (error) {
+          console.error(`❌ Failed to send reminder to ${t.email}:`, error);
+          continue;
+        }
+
+        await db.query(
+          "UPDATE tasks SET reminded=true WHERE id=$1",
+          [t.id]
+        );
+        
+        console.log(`✅ Reminder sent to ${t.email} for task: ${t.title}`);
+      } catch (err) {
+        console.error(`❌ Error sending reminder:`, err);
+      }
+    }
+  } catch (err) {
+    console.error("❌ Cron job error:", err);
   }
 });
+
 /* =====================
   AI NLP (Gemini)
 ===================== */
@@ -262,11 +327,9 @@ app.post("/api/nlp", authenticate, async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // Lấy thời gian hiện tại để AI hiểu "ngày mai", "tuần sau" là bao giờ
     const nowVN = new Date().toLocaleString("vi-VN", {
-  timeZone: "Asia/Ho_Chi_Minh"
-});
-;
+      timeZone: "Asia/Ho_Chi_Minh"
+    });
     
     const prompt = `
       Bạn là một trợ lý ảo quản lý công việc (Todo API).
@@ -277,7 +340,6 @@ THÔNG TIN QUAN TRỌNG (Context):
 - Ngày tháng năm hiện tại là: ${new Date().getFullYear()}.
 - Mọi mốc thời gian (hôm nay, ngày mai, cuối tuần) PHẢI tính toán dựa trên thời gian này.
 - Nếu không xác định được title, hãy tạo title ngắn gọn từ nội dung người dùng.
-
 
 INPUT: "${text}"
 
@@ -295,25 +357,24 @@ OUTPUT JSON FORMAT (Chỉ trả về JSON thuần, không markdown):
     const response = await result.response;
     let textResponse = response.text();
 
-    // Làm sạch chuỗi nếu AI lỡ trả về format markdown (```json ...)
     textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
 
     const data = JSON.parse(textResponse);
 
     res.json({
-      title: data.title || text, // Fallback nếu AI không tách được title
+      title: data.title || text,
       deadline: data.deadline
     });
 
   } catch (err) {
     console.error("NLP ERROR:", err);
-    // Fallback về logic cũ nếu AI lỗi hoặc hết quota
     res.json({
       title: text,
       deadline: null
     });
   }
 });
+
 /* =====================
    START
 ===================== */
