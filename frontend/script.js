@@ -191,6 +191,7 @@ $('btn-resend-otp').onclick = async () => {
 /* ================= UI ================= */
 // FIX: Sửa lại để khớp với id trong HTML
 $('switch-register').onclick = () => toggleAuth(false);
+$('switch-login').onclick = () => toggleAuth(true);
 
 function toggleAuth(showLogin) {
   $('auth-container').classList.toggle('hidden', !showLogin);
@@ -213,6 +214,27 @@ async function fetchTasks() {
   render();
 }
 
+// THÊM CÔNG VIỆC THỦ CÔNG
+$('add-btn').onclick = async () => {
+  const title = $('task-input').value.trim();
+  const deadline = $('deadline-input').value;
+
+  if (!title) return alert('Vui lòng nhập tên công việc');
+
+  const taskData = {
+    title,
+    deadline: deadline ? new Date(deadline).toISOString() : null
+  };
+
+  await apiFetch('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify(taskData)
+  });
+
+  $('task-input').value = '';
+  $('deadline-input').value = '';
+  fetchTasks();
+};
 
 $('nlp-btn').onclick = async () => {
   const text = $('nlp-input').value.trim();
