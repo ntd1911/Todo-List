@@ -1,5 +1,5 @@
 /* ================= CONFIG & STATE ================= */
-const API = "https://todoapp-tgd4.onrender.com/";
+const API = "https://todoapp-tgd4.onrender.com";
 
 const state = {
   token: localStorage.getItem('token'),
